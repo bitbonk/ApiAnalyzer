@@ -59,10 +59,10 @@ foreach (var project in solution.Projects.OrderBy(p => p.FilePath))
                     var hasExtensionMethods = symbol.GetMembers()
                         .OfType<IMethodSymbol>()
                         .Any(m => m is
-                                  {
-                                      DeclaredAccessibility: Accessibility.Public, 
-                                      IsExtensionMethod: true
-                                  });
+                        {
+                            DeclaredAccessibility: Accessibility.Public,
+                            IsExtensionMethod: true
+                        });
 
                     if (hasExtensionMethods) extensionMethodTypes[relativeProjectPath].Add(symbol);
                 }
@@ -90,10 +90,8 @@ foreach (var kvp in publicTypes.Where(kvp => kvp.Value.Count > 1).OrderBy(kvp =>
     await writer.WriteLineAsync($"# {kvp.Key}");
     await writer.WriteLineAsync();
     foreach (var v in kvp.Value.OrderBy(v => v.ToDisplayString()))
-    {
-        var extenionMethod = extensionMethodTypes[kvp.Key].Contains(v) ? " (extension methods)" : "";
-        await writer.WriteLineAsync($" - `{v.ToDisplayString()}`{extenionMethod}");
-    }
+        await writer.WriteLineAsync(
+            $" - `{v.ToDisplayString()}`{(extensionMethodTypes[kvp.Key].Contains(v) ? " (extension methods)" : "")}");
 
     await writer.WriteLineAsync();
 }

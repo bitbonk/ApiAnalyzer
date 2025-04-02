@@ -20,7 +20,8 @@ Console.WriteLine($"Loading solution: {solutionPath}");
 var solution = await workspace.OpenSolutionAsync(solutionPath);
 
 var publicTypes = new Dictionary<string, HashSet<INamedTypeSymbol>>();
-var publicMembers = new Dictionary<INamedTypeSymbol, HashSet<ISymbol>>(SymbolEqualityComparer.Default);
+var publicMembers =
+    new Dictionary<INamedTypeSymbol, Dictionary<ISymbol, INamedTypeSymbol>>(SymbolEqualityComparer.Default);
 
 var solutionDir = Path.GetDirectoryName(solution.FilePath);
 
@@ -47,29 +48,62 @@ foreach (var project in solution.Projects.OrderBy(p => p.FilePath))
         {
             var typeSymbol = semanticModel.GetDeclaredSymbol(typeSyntax);
             if (typeSymbol is {DeclaredAccessibility: Accessibility.Public, ContainingType: null})
-            {
-                foreach (var publicMember in typeSymbol.GetMembers()
-                             .Where(member => member.DeclaredAccessibility == Accessibility.Public
-                                              && member.Name.Contains("subscribe", StringComparison.OrdinalIgnoreCase)))
+                foreach (var publicMember in GetMembersIncludingDerived(typeSymbol)
+                             .Where(member => member.Member.DeclaredAccessibility == Accessibility.Public
+                                              && member.Member.Name.Contains("subscribe",
+                                                  StringComparison.OrdinalIgnoreCase)))
                 {
                     if (!publicTypes.ContainsKey(relativeProjectPath))
-                    {
-                        publicTypes[relativeProjectPath] = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-                    }
-                    
+                        publicTypes[relativeProjectPath] =
+                            new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+
                     publicTypes[relativeProjectPath].Add(typeSymbol);
 
                     if (!publicMembers.ContainsKey(typeSymbol))
-                    {
-                        publicMembers[typeSymbol] = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-                    }
-                    
-                    publicMembers[typeSymbol].Add(publicMember);
+                        publicMembers[typeSymbol] =
+                            new Dictionary<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
+
+                    publicMembers[typeSymbol].Add(publicMember.Member, publicMember.Type);
                 }
-            }
         }
     }
 }
+
+static IEnumerable<(ISymbol Member, INamedTypeSymbol Type)> GetMembersIncludingDerived(INamedTypeSymbol typeSymbol)
+{
+    var processedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+    var typesToProcess = new Stack<INamedTypeSymbol>();
+    typesToProcess.Push(typeSymbol);
+
+    while (typesToProcess.Count > 0)
+    {
+        var currentType = typesToProcess.Pop();
+
+        // Skip if already processed
+        if (!processedTypes.Add(currentType))
+        {
+            continue;
+        }
+
+        // Yield all members of the current type
+        foreach (var member in currentType.GetMembers())
+        {
+            yield return (member, currentType);
+        }
+
+        // Enqueue base type and implemented interfaces
+        if (currentType.BaseType != null)
+        {
+            typesToProcess.Push(currentType.BaseType);
+        }
+
+        foreach (var interfaceType in currentType.Interfaces)
+        {
+            typesToProcess.Push(interfaceType);
+        }
+    }
+}
+
 
 var output = "c:/temp/public-subscription-members.md";
 
@@ -88,14 +122,18 @@ foreach (var kvp in publicTypes.Where(kvp => kvp.Value.Count > 1).OrderBy(kvp =>
 {
     await writer.WriteLineAsync($"# {kvp.Key}");
     await writer.WriteLineAsync();
-    foreach (var v in kvp.Value.OrderBy(v => v.ToDisplayString()))
+    foreach (var typeWithMembers in kvp.Value.OrderBy(v => v.ToDisplayString()))
     {
-        await writer.WriteLineAsync($"## `{v.ToDisplayString()}`");
+        await writer.WriteLineAsync($"## `{typeWithMembers.ToDisplayString()}`");
         await writer.WriteLineAsync();
 
-        foreach (var member in publicMembers[v].OrderBy(m => m.ToDisplayString()))
-            await writer.WriteLineAsync($"- `{member.ToDisplayString()}`");
-        
+        foreach (var member in publicMembers[typeWithMembers]
+                     .OrderBy(m => m.Key.ToDisplayString()))
+        {
+            var baseType = SymbolEqualityComparer.Default.Equals(typeWithMembers, member.Value) ? "" : $" (inherited from `{member.Value.Name}`)";
+            await writer.WriteLineAsync($"- `{member.Key.ToDisplayString()}`{baseType}");
+        }
+
         await writer.WriteLineAsync();
     }
 }

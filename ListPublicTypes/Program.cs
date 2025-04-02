@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.MSBuild;
 
 if (args.Length == 0)
 {
-    Console.WriteLine("Usage: ApiAnalyzer <solution-path>");
+    Console.WriteLine("Usage: ListPublicTypes <solution-path>");
     return;
 }
 

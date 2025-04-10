@@ -118,7 +118,7 @@ await writer.WriteLineAsync($"- Types: {typeCount}");
 await writer.WriteLineAsync($"- Members: {publicMembers.Values.Sum(set => set.Count)}");
 await writer.WriteLineAsync();
 
-foreach (var kvp in publicTypes.Where(kvp => kvp.Value.Count > 1).OrderBy(kvp => kvp.Key))
+foreach (var kvp in publicTypes.Where(kvp => kvp.Value.Count > 0).OrderBy(kvp => kvp.Key))
 {
     await writer.WriteLineAsync($"# {kvp.Key}");
     await writer.WriteLineAsync();

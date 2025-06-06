@@ -1,4 +1,5 @@
 ﻿<Solution>
+  <Project Path="ListConfigurationOptions\ListConfigurationOptions.csproj" Type="Classic C#" />
   <Project Path="ListPublicApisUsingType\ListPublicApisUsingType.csproj" Type="Classic C#" />
   <Project Path="ListPublicSubscriptionApis\ListPublicSubscriptionApis.csproj" Type="Classic C#" />
   <Project Path="ListPublicTypes\ListPublicTypes.csproj" Type="Classic C#" />
